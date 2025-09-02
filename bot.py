@@ -45,4 +45,4 @@ async def inbox(ctx):
     except Exception as e:
         await ctx.reply(f"❌ Error: {e}")
 
-bot.run("YOUR_BOT_TOKEN")  # <-- put your Discord bot token here
+bot.run("PASTE_YOUR_REAL_TOKEN_HERE")  # <-- put your Discord bot token here
