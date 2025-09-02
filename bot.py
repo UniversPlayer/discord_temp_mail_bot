@@ -1,53 +1,48 @@
-import os
 import discord
 from discord.ext import commands
 from mail_utils import generate_temp_email, get_inbox
 
 intents = discord.Intents.default()
 intents.message_content = True
-bot = commands.Bot(command_prefix='$', intents=intents)
+bot = commands.Bot(command_prefix="$", intents=intents)
 
-TOKEN = os.getenv("DISCORD_TOKEN")
-CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
+# Store user tokens so they don't need to copy-paste
+user_tokens = {}
 
-user_emails = {}
-
-@bot.event
-async def on_ready():
-    print(f'Logged in as {bot.user}')
-
+# Command to generate new email (sends in DM)
 @bot.command()
 async def mail(ctx):
-    if ctx.channel.id != CHANNEL_ID:
-        return
+    try:
+        email, token = generate_temp_email()
+        user_tokens[ctx.author.id] = token
+        await ctx.author.send(f"📧 Your temp email: `{email}`\n🔑 Token saved automatically.")
+        await ctx.reply("✅ Check your DMs for your temp email!")
+    except Exception as e:
+        await ctx.reply(f"❌ Error: {e}")
 
-    await ctx.send("Generating email...")
-
-    login, domain, email = generate_temp_email()
-    user_emails[ctx.author.id] = (login, domain)
-
-    await ctx.send(f"Email Generated ✅\nSending the temp mail to {ctx.author.mention}\n`{email}`")
-
+# Command to check inbox (uses saved token, sends in DM)
 @bot.command()
-async def inbox(ctx, email=None):
-    if ctx.channel.id != CHANNEL_ID:
-        return
+async def inbox(ctx):
+    try:
+        token = user_tokens.get(ctx.author.id)
+        if not token:
+            await ctx.reply("⚠️ You don’t have a saved token. Use `$mail` first.")
+            return
 
-    if ctx.author.id not in user_emails:
-        await ctx.send("You haven't generated a temp mail yet. Use `$mail` first.")
-        return
+        messages = get_inbox(token)
+        if not messages:
+            await ctx.author.send("📭 Inbox is empty.")
+        else:
+            reply = "✉️ **Inbox Messages:**\n"
+            for m in messages:
+                reply += f"From: `{m['from']['address']}`\n"
+                reply += f"Subject: `{m['subject']}`\n"
+                reply += f"Text: {m['intro']}\n"
+                reply += "--------------------\n"
+            await ctx.author.send(reply)
 
-    login, domain = user_emails[ctx.author.id]
-    inbox_data = get_inbox(login, domain)
+        await ctx.reply("✅ Check your DMs for inbox messages!")
+    except Exception as e:
+        await ctx.reply(f"❌ Error: {e}")
 
-    if not inbox_data:
-        await ctx.send("📭 Inbox is empty.")
-        return
-
-    messages = []
-    for mail in inbox_data[-5:]:  # Show last 5 messages
-        messages.append(f"From: `{mail['from']}` | Subject: `{mail['subject']}`")
-
-    await ctx.send("\n".join(messages))
-
-bot.run(TOKEN)
+bot.run("YOUR_BOT_TOKEN")  # <-- put your Discord bot token here
